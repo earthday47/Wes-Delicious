@@ -1,0 +1,5 @@
+name = Recent Delicious Bookmarks
+description = "Displays recent Delicious bookmarks in a block."
+core = 7.x
+package = Wes
+configure = admin/structure/block/manage/wes_delicious/delicious/configure

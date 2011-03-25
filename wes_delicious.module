@@ -1,0 +1,147 @@
+<?php
+/**
+ * @file
+ * This module displays a recent Delicious bookmarks pulled via JSON.
+ */
+
+/**
+ * Implements hook_block_info().
+ */
+function wes_delicious_block_info() {
+  $blocks['delicious'] = array(
+    'info' => t('Wes Delicious'),
+    'cache' => DRUPAL_CACHE_PER_PAGE,
+    'status' => TRUE,
+    'region' => 'sidebar_second',
+    'visibility' => 1,
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_configure().
+ */
+function wes_delicious_block_configure($delta = '') {
+  $form = array();
+  if ($delta == 'delicious') {
+    $form['delicious'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Delicious.com settings'),
+    );
+    $form['delicious']['wes_delicious_username'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Delicious.com Username'),
+      '#size' => 20,
+      '#description' => t('Used to build the delicious.com feed URL.'),
+      '#default_value' => variable_get('wes_delicious_username', ''),
+    );
+    $form['delicious']['wes_delicious_count'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Number of bookmarks to display'),
+      '#size' => 4,
+      '#description' => '',
+      '#default_value' => variable_get('wes_delicious_count', 5),
+    );
+  }
+  return $form;
+}
+
+/**
+ * Implements hook_block_save().
+ */
+function wes_delicious_block_save($delta = '', $edit = array()) {
+  if ($delta == 'delicious') {
+    variable_set('wes_delicious_username', $edit['wes_delicious_username']);
+    variable_set('wes_delicious_count', $edit['wes_delicious_count']);
+  }
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function wes_delicious_block_view($delta = '') {
+  $block = '';
+  switch ($delta) {
+    case 'delicious':
+      // partly lifted from ninesixtyrobots/template.php
+      $delicious_username = variable_get('wes_delicious_username', '');
+      $count = variable_get('wes_delicious_count', 5);
+      if ($delicious_username) {
+        // query feeds.delicious.com and return JSON data
+        $response = drupal_http_request('http://feeds.delicious.com/v2/json/' . $delicious_username . '?count=' . $count);
+        $data = json_decode($response->data);
+        if (!empty($data)) {
+          $block['subject'] = t('Recent Delicious Bookmarks');
+          $block['content'] = wes_delicious_block_contents($data);
+        }
+      }
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Custom block content function.
+ *
+ * @see wes_delicious_block_view()
+ */
+function wes_delicious_block_contents($data) {
+  $render_array = array();
+  foreach ($data as $bookmark) {
+    //dpm($bookmark);
+    // the Delicious bookmark object is sent as-is to the theme function.
+    // Let's hope Delicious doesn't change their format; as of 3/24/11 it looks like this:
+    //   u - page url
+    //   d - page title
+    //   t - an array of tags
+    //   dt - date and time
+    //   n - ?
+    //   a - account username
+    // add theme function for rendering the link
+    //$render_array[] = array_merge((array) $bookmark, array('#theme' => 'wes_delicious_render_link'));
+    $render_array['bookmarks'][] = (array) $bookmark;
+  }
+  // add the theme function for rendering the list
+  $render_array['#theme'] = 'wes_delicious_render_list';
+  return $render_array;
+}
+
+/**
+ * Theme function for rendering a delicious bookmark link.
+ */
+/*function theme_wes_delicious_render_link($variables) {
+  //dpm($variables);
+  $element = $variables['element'];
+  $output = l($element['d'], $element['u']);
+  return $output;
+}*/
+
+/**
+ * Theme function for rendering a list of Delicious bookmark links.
+ */
+function theme_wes_delicious_render_list($variables) {
+  //dpm($variables);
+  $element = $variables['element'];
+  $output = '<ul class="delicious-list">';
+  foreach ($element['bookmarks'] as $bookmark) {
+    //dpm($bookmark);
+    $output .= '<li>' . l($bookmark['d'], $bookmark['u']) . '</li>';
+  }
+  $output .= '</ul>';
+  return $output;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function wes_delicious_theme() {
+  $items = array(
+    /*'wes_delicious_render_link' => array(
+      'render element' => 'element',
+    ),*/
+    'wes_delicious_render_list' => array(
+      'render element' => 'element',
+    ),
+  );
+  return $items;
+}
